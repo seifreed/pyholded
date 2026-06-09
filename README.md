@@ -188,7 +188,7 @@ holded raw GET taxes -o toon
 | `holded <resource> create --data <json>` | Create a record |
 | `holded <resource> update --id <id> --data <json>` | Update a record |
 | `holded <resource> delete --id <id>` | Delete a record |
-| `holded invoices get-pdf --id <id>` | Download a document PDF (also `pay`, `send`) |
+| `holded invoices get-pdf --id <id>` | Download a document PDF (also `send`) |
 | `holded raw <METHOD> <PATH>` | Call an arbitrary endpoint |
 
 ### Options
@@ -207,7 +207,7 @@ holded raw GET taxes -o toon
 
 | Group | Resources |
 |-------|-----------|
-| **Documents** (CRUD + `get-pdf`, `pay`, `send`) | `invoices`, `credit_notes`, `sales_orders`, `estimates`, `proformas`, `waybills`, `sales_receipts`, `purchases`, `purchase_orders` |
+| **Documents** (CRUD + `get-pdf`, `send`) | `invoices`, `credit_notes`, `sales_orders`, `estimates`, `proformas`, `waybills`, `sales_receipts`, `purchases`, `purchase_orders` |
 | **Masters** (CRUD) | `contacts`, `contact_groups`, `products`, `services`, `warehouses`, `payments`, `sales_channels`, `expenses_accounts`, `taxes`, `payment_methods` |
 | **CRM** | `funnels`, `leads` (+ `create-note`, `create-task`), `events`, `bookings`, `booking_locations` |
 | **Projects / Team** | `projects`, `tasks`, `employees` |

@@ -43,15 +43,18 @@ def _crud(
 
 
 def _document(segment: str, singular: str) -> Resource:
-    """Build a sales/purchase document resource: CRUD + pdf/pay/send actions.
+    """Build a sales/purchase document resource: CRUD + pdf/send actions.
 
     The resource name is the plural path ``segment`` (snake-cased); ``singular``
     is only used to phrase the help text.
 
-    Note on the v2 document body: ``create``/``update`` expect line items under
-    the ``items`` key, while ``get`` returns them under ``lines`` — pass
-    ``data={"contact_id": ..., "items": [{"name", "units", "price", "tax"}]}``.
-    Documents are created as drafts (no fiscal number) until issued.
+    Notes on the v2 document API (verified live):
+    - ``create``/``update`` expect line items under the ``items`` key, while
+      ``get`` returns them under ``lines`` — pass
+      ``data={"contact_id": ..., "items": [{"name", "units", "price", "tax"}]}``.
+    - Documents are created as drafts (no fiscal number) until issued.
+    - There is no ``/pay`` action; register payments via the ``payments``
+      resource (``document_type`` + ``document_id`` link the payment).
     """
     name = segment.replace("-", "_")
     item = f"{segment}/{{id}}"
@@ -66,9 +69,6 @@ def _document(segment: str, singular: str) -> Resource:
             Endpoint("update", "PUT", item, f"Update a {singular}.", has_body=True),
             Endpoint("delete", "DELETE", item, f"Delete a {singular}."),
             Endpoint("getPdf", "GET", f"{item}/pdf", f"Download the {singular} PDF.", binary=True),
-            Endpoint(
-                "pay", "POST", f"{item}/pay", f"Register a payment on a {singular}.", has_body=True
-            ),
             Endpoint("send", "POST", f"{item}/send", f"Send a {singular} by email.", has_body=True),
         ),
     )
