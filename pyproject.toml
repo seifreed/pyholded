@@ -1,0 +1,91 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyholded"
+version = "0.1.0"
+description = "Modular Python client and CLI for the complete Holded API, with rich, JSON and TOON output."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+license = "MIT"
+authors = [{ name = "Marc Rivero López", email = "mriverolopez@gmail.com" }]
+keywords = ["holded", "api", "client", "cli", "invoicing", "crm", "accounting"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Office/Business :: Financial :: Accounting",
+  "Typing :: Typed",
+]
+dependencies = [
+  "httpx>=0.28",
+  "click>=8.1",
+  "rich>=13.9",
+  "toons>=0.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/seifreed/pyholded"
+Documentation = "https://developers.holded.com"
+Issues = "https://github.com/seifreed/pyholded/issues"
+
+[project.scripts]
+holded = "pyholded.cli:main"
+pyholded = "pyholded.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "black",
+  "mypy",
+  "bandit",
+  "vulture",
+  "pip-audit",
+  "pytest",
+  "pytest-httpx",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyholded"]
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PL", "ARG"]
+
+[tool.ruff.lint.pylint]
+# Click command callbacks and the registry builder legitimately take more than
+# five keyword arguments; collapsing them into a config object would be a needless
+# abstraction. This raises the threshold project-wide rather than suppressing it.
+max-args = 8
+
+[tool.black]
+line-length = 100
+target-version = ["py314"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+files = ["src", "tests"]
+exclude = ["^venv/", "^\\.venv/", "^build/"]
+
+[tool.bandit]
+# Scope to the shipped package; build tooling and tests are not shipped code.
+exclude_dirs = ["tests", "scripts", "venv", ".venv"]
+
+[tool.vulture]
+paths = ["src"]
+min_confidence = 80
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
