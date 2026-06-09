@@ -79,9 +79,12 @@ def resolve_config(
         file_values = load_config_file(path)
 
     token = explicit_token or _token_from_env() or file_values.get("token")
+    # Strip surrounding whitespace/newlines (e.g. a token read from a file or
+    # pasted with a trailing newline) so it cannot silently corrupt the header.
+    token = token.strip() if token else token
     if not token:
         raise ConfigError(
-            "No Holded API token found. Provide --token, set the HOLDED_API_KEY "
+            "No Holded API token found. Provide --token, set the HOLDED_TOKEN "
             "environment variable, or add 'token' to your config file."
         )
 

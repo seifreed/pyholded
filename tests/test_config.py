@@ -38,3 +38,18 @@ def test_missing_token_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.delenv("HOLDED_TOKEN", raising=False)
     with pytest.raises(ConfigError):
         resolve_config(config_path=tmp_path / "absent.toml")
+
+
+def test_token_is_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Regression: a token read from a file/env may carry a trailing newline,
+    # which would otherwise corrupt the Authorization header.
+    monkeypatch.delenv("HOLDED_API_KEY", raising=False)
+    monkeypatch.setenv("HOLDED_TOKEN", "pat_abc\n")
+    assert resolve_config(config_path=Path("/none.toml")).token == "pat_abc"
+
+
+def test_whitespace_only_token_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HOLDED_API_KEY", raising=False)
+    monkeypatch.delenv("HOLDED_TOKEN", raising=False)
+    with pytest.raises(ConfigError):
+        resolve_config("   ", config_path=Path("/none.toml"))
