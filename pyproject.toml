@@ -45,6 +45,8 @@ dev = [
   "pip-audit",
   "pytest",
   "pytest-httpx",
+  "cryptography",
+  "cyclonedx-bom",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -76,6 +78,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 disallow_any_generics = true
 files = ["src", "tests"]
+mypy_path = "scripts"
 exclude = ["^venv/", "^\\.venv/", "^build/"]
 
 [tool.bandit]

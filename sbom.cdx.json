@@ -844,7 +844,7 @@
       },
       "purl": "pkg:pypi/pyholded@0.1.0"
     },
-    "timestamp": "2026-06-09T09:36:14.768752+00:00",
+    "timestamp": "2026-06-09T12:28:04.544855+00:00",
     "tools": {
       "components": [
         {
@@ -943,7 +943,7 @@
           ],
           "name": "cyclonedx-python-lib",
           "type": "library",
-          "version": "11.7.0"
+          "version": "11.9.0"
         }
       ]
     },
@@ -972,7 +972,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:1547d3c6-bfbc-4ec7-9d5b-dde4f9d08f7b",
+  "serialNumber": "urn:uuid:53179381-0d43-4caa-87a0-9a3b610648ba",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
@@ -1002,9 +1002,9 @@
     "publicKey": {
       "kty": "EC",
       "crv": "P-256",
-      "x": "O6tVWTwa5tDCGdNerP4x6k1eO3FpJVbG6S_koHs4oiw",
-      "y": "Y6jVkFGpLHv4YRmSusveIF-sIOBL4B1eImOiifVMUg8"
+      "x": "jw-oAUK7Memod4C0ndRCzvwxTJip6ch980_5yzadh9A",
+      "y": "C_ghU74CoQsynT4KieRF2bTyJYy1MU7kntMgEEKP-lc"
     },
-    "value": "MEUCIF6OpNTsdN8JyquA2d/a79CY5ChOHqJqRyhiaNBRM2+VAiEAmgAbo3E0p48PbPZIKh2tIg5w6Dtxc1jm8oCB9K+QZFg="
+    "value": "Y8fhoIb28ZUJkx0JFlbysiChJ0-TemUpen8SnF9FmIU99YpZhD72suI7oLr64g9mWjvtd2YR73idfCg3PXj-qA"
   }
 }

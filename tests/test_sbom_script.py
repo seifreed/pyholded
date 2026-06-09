@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
-_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "generate_sbom.py"
+import verify_sbom  # exposed on sys.path by tests/conftest.py
+
+_ROOT = Path(__file__).resolve().parent.parent
+_SCRIPT = _ROOT / "scripts" / "generate_sbom.py"
+_SBOM = _ROOT / "sbom.cdx.json"
 
 
 def test_missing_lockfile_fails_clearly(tmp_path: Path) -> None:
@@ -20,3 +25,15 @@ def test_missing_lockfile_fails_clearly(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "lockfile not found" in result.stderr
+
+
+def test_committed_sbom_signature_is_valid() -> None:
+    # Regression: the committed SBOM must carry a valid embedded ES256 signature.
+    sbom = json.loads(_SBOM.read_text(encoding="utf-8"))
+    assert verify_sbom.verify(sbom) is True
+
+
+def test_tampered_sbom_signature_is_rejected() -> None:
+    sbom = json.loads(_SBOM.read_text(encoding="utf-8"))
+    sbom["metadata"]["authors"] = [{"name": "tampered"}]
+    assert verify_sbom.verify(sbom) is False

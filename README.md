@@ -271,14 +271,14 @@ print(to_toon(page))              # TOON string
 A CycloneDX 1.6 SBOM ([`sbom.cdx.json`](sbom.cdx.json)) is generated from real data —
 package SHA-256 hashes come from a `uv`-compiled hashed lockfile
 ([`requirements.lock`](requirements.lock)), licenses and suppliers from installed
-package metadata, a full dependency graph, and a **cosign signature** embedded as a
-CycloneDX JSF block (signed offline, no transparency-log upload). CI regenerates,
-scores and verifies it.
+package metadata, a full dependency graph, and an **ECDSA P-256 (ES256) signature**
+embedded as a CycloneDX JSF block (pure-Python, offline, no external tools). CI
+regenerates, scores and verifies it on every push.
 
 ```bash
-make sbom          # generate + sign sbom.cdx.json (cosign)
+make sbom          # generate + sign sbom.cdx.json
 make sbom-score    # generate + score with sbomqs (fails below 9.0)
-make sbom-verify   # verify the embedded signature with cosign
+make sbom-verify   # verify the embedded signature
 make lock          # refresh the hashed lockfile (uv)
 ```
 
@@ -289,8 +289,8 @@ missing data (the `dependencies` and `compositions` are present and valid). A pe
 10/A is not attainable for a PyPI project (it also requires per-component CPEs, which
 Python packages do not have).
 
-The signing private key is never committed; `signing/cosign.pub` and the detached
-`sbom.cdx.json.bundle` are, so anyone can verify.
+The signing private key is never committed; the public key travels inside the SBOM
+(`signature.publicKey` JWK), so `scripts/verify_sbom.py` verifies it with no extra files.
 
 ## Requirements
 

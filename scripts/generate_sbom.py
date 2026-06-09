@@ -22,17 +22,18 @@ from __future__ import annotations
 import argparse
 import base64
 import json
-import os
 import re
 import shutil
 import subprocess
-import tempfile
 from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-_EC_POINT_LEN = 65  # uncompressed P-256 point: 0x04 || X(32) || Y(32)
-_EC_UNCOMPRESSED = 0x04
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+_EC_COORD_BYTES = 32  # P-256 coordinate size
 
 _MAX_LICENSE_LEN = 64
 _HASH_RE = re.compile(r"--hash=sha256:([0-9a-f]{64})")
@@ -237,69 +238,56 @@ def _b64url(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def _public_key_jwk(pub_pem: Path) -> dict[str, str]:
-    """Derive a P-256 JWK from a PEM EC public key (SubjectPublicKeyInfo)."""
-    body = "".join(
-        line for line in pub_pem.read_text(encoding="utf-8").splitlines() if "-----" not in line
-    )
-    der = base64.b64decode(body)
-    point = der[-_EC_POINT_LEN:]
-    if point[0] != _EC_UNCOMPRESSED:
-        raise ValueError("unexpected EC public key encoding (not uncompressed P-256)")
-    return {
-        "kty": "EC",
-        "crv": "P-256",
-        "x": _b64url(point[1:33]),
-        "y": _b64url(point[33:65]),
-    }
-
-
 def _canonical_bytes(sbom: dict[str, Any]) -> bytes:
     """Deterministic JSON bytes of the SBOM (signature excluded) — the signing payload."""
     payload = {key: value for key, value in sbom.items() if key != "signature"}
     return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def sign(
-    sbom: dict[str, Any], key: Path, pub: Path, signing_config: Path, bundle_out: Path
-) -> None:
-    """Embed a JSF signature produced by cosign (offline, no transparency log)."""
-    cosign = shutil.which("cosign")
-    if cosign is None:
-        raise RuntimeError("cosign not found on PATH")
-    with tempfile.NamedTemporaryFile("wb", suffix=".json", delete=False) as payload_file:
-        payload_file.write(_canonical_bytes(sbom))
-        payload_path = Path(payload_file.name)
-    # A signing-config (newer cosign) keeps signing offline (no transparency log).
-    # Older cosign signs offline by default and has no such config — only pass it
-    # when present so both generations work.
-    config_args = ["--signing-config", str(signing_config)] if signing_config.exists() else []
-    try:
-        subprocess.run(
-            [
-                cosign,
-                "sign-blob",
-                "--key",
-                str(key),
-                "--yes",
-                *config_args,
-                "--bundle",
-                str(bundle_out),
-                str(payload_path),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            env={**os.environ, "COSIGN_PASSWORD": os.environ.get("COSIGN_PASSWORD", "")},
+def _load_or_create_key(key_path: Path) -> ec.EllipticCurvePrivateKey:
+    """Load a PEM P-256 private key, generating and persisting one if absent."""
+    if key_path.exists():
+        loaded = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
+        if not isinstance(loaded, ec.EllipticCurvePrivateKey):
+            raise TypeError(f"{key_path} is not an EC private key")
+        return loaded
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.write_bytes(
+        private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
         )
-    finally:
-        payload_path.unlink(missing_ok=True)
-    bundle = json.loads(bundle_out.read_text(encoding="utf-8"))
-    signature = bundle["messageSignature"]["signature"]
+    )
+    return private_key
+
+
+def _jwk(private_key: ec.EllipticCurvePrivateKey) -> dict[str, str]:
+    numbers = private_key.public_key().public_numbers()
+    return {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": _b64url(numbers.x.to_bytes(_EC_COORD_BYTES, "big")),
+        "y": _b64url(numbers.y.to_bytes(_EC_COORD_BYTES, "big")),
+    }
+
+
+def sign(sbom: dict[str, Any], key_path: Path) -> None:
+    """Embed a CycloneDX JSF signature (ECDSA P-256 / ES256) over the SBOM.
+
+    Self-contained and deterministic — no external tool. The signing key is a
+    standard PEM under ``key_path`` (generated on first use). The public key is
+    embedded as a JWK, so the signature is independently verifiable.
+    """
+    private_key = _load_or_create_key(key_path)
+    der_signature = private_key.sign(_canonical_bytes(sbom), ec.ECDSA(hashes.SHA256()))
+    r, s = decode_dss_signature(der_signature)
+    raw = r.to_bytes(_EC_COORD_BYTES, "big") + s.to_bytes(_EC_COORD_BYTES, "big")
     sbom["signature"] = {
         "algorithm": "ES256",
-        "publicKey": _public_key_jwk(pub),
-        "value": signature,
+        "publicKey": _jwk(private_key),
+        "value": _b64url(raw),
     }
 
 
@@ -331,8 +319,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lock", type=Path, default=Path("requirements.lock"))
     parser.add_argument("--pyproject", type=Path, default=Path("pyproject.toml"))
     parser.add_argument("--output", type=Path, default=Path("sbom.cdx.json"))
-    parser.add_argument("--sign", action="store_true", help="embed a cosign JSF signature")
-    parser.add_argument("--signing-dir", type=Path, default=Path("signing"))
+    parser.add_argument("--sign", action="store_true", help="embed an ECDSA JSF signature")
+    parser.add_argument(
+        "--key", type=Path, default=Path("signing/signing-key.pem"), help="PEM signing key"
+    )
     args = parser.parse_args(argv)
 
     # The lockfile defines the runtime scope and the component hashes; without it
@@ -346,13 +336,7 @@ def main(argv: list[str] | None = None) -> int:
 
     signed = False
     if args.sign:
-        sign(
-            enriched,
-            key=args.signing_dir / "cosign.key",
-            pub=args.signing_dir / "cosign.pub",
-            signing_config=args.signing_dir / "signing-config.json",
-            bundle_out=args.output.with_suffix(args.output.suffix + ".bundle"),
-        )
+        sign(enriched, key_path=args.key)
         signed = True
 
     args.output.write_text(json.dumps(enriched, indent=2) + "\n", encoding="utf-8")

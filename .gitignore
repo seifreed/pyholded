@@ -2,7 +2,8 @@
 CLAUDE.md
 .claude/
 
-# Signing — never commit private keys (public key + signing-config are committed)
+# Signing — never commit private keys (the public key is embedded in the SBOM)
+signing/signing-key.pem
 signing/cosign.key
 *.key
 
