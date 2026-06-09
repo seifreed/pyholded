@@ -270,6 +270,10 @@ def sign(
     with tempfile.NamedTemporaryFile("wb", suffix=".json", delete=False) as payload_file:
         payload_file.write(_canonical_bytes(sbom))
         payload_path = Path(payload_file.name)
+    # A signing-config (newer cosign) keeps signing offline (no transparency log).
+    # Older cosign signs offline by default and has no such config — only pass it
+    # when present so both generations work.
+    config_args = ["--signing-config", str(signing_config)] if signing_config.exists() else []
     try:
         subprocess.run(
             [
@@ -278,8 +282,7 @@ def sign(
                 "--key",
                 str(key),
                 "--yes",
-                "--signing-config",
-                str(signing_config),
+                *config_args,
                 "--bundle",
                 str(bundle_out),
                 str(payload_path),

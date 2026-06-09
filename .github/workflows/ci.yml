@@ -79,6 +79,8 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v3.1.0'
       - name: Generate signing key (ephemeral)
         run: |
           mkdir -p signing
