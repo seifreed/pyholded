@@ -74,8 +74,8 @@ jobs:
           pip install -e ".[dev]"
       - name: Install sbomqs
         run: |
-          curl -sSfL https://raw.githubusercontent.com/interlynk-io/sbomqs/main/install.sh | sh -s -- -b "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          go install github.com/interlynk-io/sbomqs@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Generate signed SBOM
         run: python scripts/generate_sbom.py --sign --output sbom.cdx.json
       - name: Verify SBOM signature
