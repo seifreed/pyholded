@@ -4,9 +4,12 @@ The CLI mirrors the endpoint registry: every resource is a command group and
 every operation a subcommand whose path/query parameters are flags. Output is
 selectable per invocation (``--output rich|json|toon``)::
 
-    holded documents list --doc-type invoice
-    holded contacts get --contact-id 123 --output json
-    holded raw GET invoicing/v1/contacts --output toon
+    holded invoices list --limit 50
+    holded contacts get --id 0123456789abcdef01234567 --output json
+    holded --account acme contacts list          # one named account
+    holded --all-accounts contacts list          # fan out to every account
+    holded accounts                               # list configured accounts
+    holded raw GET taxes --output toon
 """
 
 from __future__ import annotations
@@ -20,8 +23,10 @@ import click
 
 from ._registry import Endpoint, Resource
 from .client import HoldedClient
+from .config import resolve_accounts
 from .endpoints import REGISTRY
 from .exceptions import HoldedError
+from .multi import MultiClient
 from .output import OutputFormat, render
 
 
@@ -35,20 +40,43 @@ class _Context:
         base_url: str | None,
         output: str,
         timeout: float,
+        account: str | None,
+        all_accounts: bool,
     ) -> None:
         self.token = token
         self.config = config
         self.base_url = base_url
         self.output = OutputFormat(output)
         self.timeout = timeout
+        self.account = account
+        self.all_accounts = all_accounts
 
     def client(self) -> HoldedClient:
         return HoldedClient(
             self.token,
+            account=self.account,
             base_url=self.base_url,
             config_path=self.config,
             timeout=self.timeout,
         )
+
+    def multi(self) -> MultiClient:
+        return MultiClient.from_accounts(config_path=self.config, timeout=self.timeout)
+
+    def run_call(self, resource: str, operation: str, **kwargs: Any) -> Any:
+        """Run an operation on the selected account, or fan out to all accounts."""
+        if self.all_accounts:
+            with self.multi() as multi:
+                return multi.call(resource, operation, **kwargs)
+        with self.client() as client:
+            return client.call(resource, operation, **kwargs)
+
+    def run_request(self, method: str, path: str, **kwargs: Any) -> Any:
+        if self.all_accounts:
+            with self.multi() as multi:
+                return multi.request(method, path, **kwargs)
+        with self.client() as client:
+            return client.request(method, path, **kwargs)
 
     def resolve_format(self, override: str | None) -> OutputFormat:
         """Per-command --output wins over the group-level default."""
@@ -157,15 +185,14 @@ def _operation_command(resource: Resource, endpoint: Endpoint) -> click.Command:
         data = (
             _parse_data(kwargs.get("data"), kwargs.get("fields", ())) if endpoint.has_body else None
         )
-        with state.client() as client:
-            result = client.call(
-                resource.name,
-                endpoint.name,
-                path_params=path_params,
-                params=query or None,
-                data=data,
-                paginate=bool(kwargs.get("fetch_all")),
-            )
+        result = state.run_call(
+            resource.name,
+            endpoint.name,
+            path_params=path_params,
+            params=query or None,
+            data=data,
+            paginate=bool(kwargs.get("fetch_all")),
+        )
         render(result, state.resolve_format(kwargs.get("output")))
 
     return click.Command(
@@ -189,6 +216,8 @@ def _resource_group(resource: Resource) -> click.Group:
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--token", envvar="HOLDED_TOKEN", help="Holded API token (PAT).")
+@click.option("-a", "--account", help="Use a named account from env/config.")
+@click.option("--all-accounts", is_flag=True, help="Run on every configured account.")
 @click.option(
     "--config",
     type=click.Path(exists=False, dir_okay=False, path_type=Path),
@@ -208,13 +237,15 @@ def _resource_group(resource: Resource) -> click.Group:
 def cli(
     ctx: click.Context,
     token: str | None,
+    account: str | None,
+    all_accounts: bool,
     config: Path | None,
     base_url: str | None,
     output: str,
     timeout: float,
 ) -> None:
     """Modular command-line client for the complete Holded API."""
-    ctx.obj = _Context(token, config, base_url, output, timeout)
+    ctx.obj = _Context(token, config, base_url, output, timeout, account, all_accounts)
 
 
 @cli.command(name="resources")
@@ -254,12 +285,24 @@ def raw(
     state: _Context = ctx.obj
     query = dict(item.partition("=")[::2] for item in params) or None
     body = _parse_data(data, ()) if data else None
-    with state.client() as client:
-        result = client.request(method, path.lstrip("/"), params=query, json=body, binary=binary)
+    result = state.run_request(method, path.lstrip("/"), params=query, json=body, binary=binary)
     if binary and isinstance(result, bytes):
         sys.stdout.buffer.write(result)
         return
     render(result, state.resolve_format(output))
+
+
+@cli.command(name="accounts")
+@click.option("-o", "--output", type=click.Choice(_OUTPUT_CHOICES), default=None)
+@click.pass_context
+def list_accounts(ctx: click.Context, output: str | None) -> None:
+    """List configured accounts (names and base URLs; tokens are never shown)."""
+    state: _Context = ctx.obj
+    accounts = resolve_accounts(state.config)
+    overview = [
+        {"account": name, "base_url": cfg.base_url} for name, cfg in sorted(accounts.items())
+    ]
+    render(overview, state.resolve_format(output))
 
 
 def _register_resources() -> None:

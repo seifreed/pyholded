@@ -6,7 +6,7 @@ from importlib import metadata
 
 from ._registry import Endpoint, Resource
 from .client import HoldedClient
-from .config import Config, resolve_config, resolve_token
+from .config import Config, resolve_accounts, resolve_config, resolve_token
 from .endpoints import REGISTRY
 from .exceptions import (
     APIError,
@@ -17,6 +17,7 @@ from .exceptions import (
     NotFoundError,
     RateLimitError,
 )
+from .multi import MultiClient
 from .output import OutputFormat, render, to_json, to_toon
 
 
@@ -39,12 +40,14 @@ __all__ = [
     "EndpointNotFoundError",
     "HoldedClient",
     "HoldedError",
+    "MultiClient",
     "NotFoundError",
     "OutputFormat",
     "RateLimitError",
     "Resource",
     "__version__",
     "render",
+    "resolve_accounts",
     "resolve_config",
     "resolve_token",
     "to_json",

@@ -100,6 +100,37 @@ token = "pat_xxx_yyy"
 # base_url = "https://api.holded.com/api/v2/"   # optional override
 ```
 
+### Multiple accounts
+
+Configure several Holded accounts and query one or all of them.
+
+Environment variables — `HOLDED_TOKEN` is the `default` account; `HOLDED_TOKEN_<NAME>`
+adds a named account:
+
+```bash
+export HOLDED_TOKEN="pat_default"
+export HOLDED_TOKEN_ACME="pat_acme"
+export HOLDED_TOKEN_PERSONAL="pat_personal"
+```
+
+Config file — per-account tables (env overrides the file for the same name):
+
+```toml
+# ~/.config/pyholded/config.toml
+default_account = "acme"          # optional; picks the account when none is given
+
+[accounts.acme]
+token = "pat_acme"
+# base_url = "..."                # optional, per account
+
+[accounts.personal]
+token = "pat_personal"
+```
+
+Select with `--account <name>` (CLI) / `HoldedClient(account="acme")` (library), or fan
+out to every account with `--all-accounts` / `MultiClient`. When several accounts are
+configured and none is selected, set `default_account` or pass one explicitly.
+
 ---
 
 ## Quick Start
@@ -137,6 +168,11 @@ holded contacts create --data '{"name": "ACME SL"}'
 holded contacts create --data @contact.json
 holded contacts create --field name=ACME --field code=B12345678
 
+# Multiple accounts
+holded accounts                               # list configured accounts
+holded --account acme contacts list           # one named account
+holded --all-accounts contacts list -o json   # fan out -> {account: result}
+
 # Call any endpoint directly
 holded raw GET taxes -o toon
 ```
@@ -146,6 +182,7 @@ holded raw GET taxes -o toon
 | Command | Description |
 |--------|-------------|
 | `holded resources` | List all resources and their operations |
+| `holded accounts` | List configured accounts (names + base URLs; tokens never shown) |
 | `holded <resource> list` | List records (cursor-paginated; `--all` fetches every page) |
 | `holded <resource> get --id <id>` | Get a single record |
 | `holded <resource> create --data <json>` | Create a record |
@@ -159,6 +196,8 @@ holded raw GET taxes -o toon
 | Option | Description |
 |--------|-------------|
 | `-o, --output {rich,json,toon}` | Output format (global default or per-command override) |
+| `-a, --account <name>` | Use a named account (env/config) |
+| `--all-accounts` | Run the command on every configured account |
 | `--all` | Follow the cursor and fetch every page (GET) |
 | `--limit`, `--cursor` | Manual pagination controls |
 | `--data <json\|@file>`, `--field k=v` | Request body for create/update |
@@ -196,6 +235,24 @@ with HoldedClient() as client:                       # token from env or config 
 
 Resources are attributes; operations are methods. Path parameters (`id`) are keyword
 arguments, query parameters go in `params=`, and the request body in `data=`.
+
+### Multiple accounts
+
+```python
+from pyholded import HoldedClient, MultiClient
+
+# one named account
+with HoldedClient(account="acme") as client:
+    invoices = client.invoices.list()
+
+# every configured account at once -> {account: result}
+with MultiClient.from_accounts() as multi:           # or from_accounts(["acme", "personal"])
+    per_account = multi.contacts.list(params={"limit": 5})
+    # {"acme": {"items": [...]}, "personal": {"items": [...]}}
+```
+
+A failure on one account is captured as `{"error": "..."}` for that account, so the
+others still return their data.
 
 ### Output Helpers
 

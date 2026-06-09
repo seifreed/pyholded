@@ -30,16 +30,23 @@ class HoldedClient:
         self,
         token: str | None = None,
         *,
+        account: str | None = None,
         base_url: str | None = None,
         config_path: Path | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         transport: Transport | None = None,
     ) -> None:
-        config = resolve_config(token, base_url=base_url, config_path=config_path)
+        config = resolve_config(token, base_url=base_url, config_path=config_path, account=account)
+        self._account = config.name
         self._transport = transport or Transport(
             config.token, base_url=config.base_url, timeout=timeout
         )
         self._resources = build_index(REGISTRY)
+
+    @property
+    def account(self) -> str:
+        """The name of the account this client is bound to."""
+        return self._account
 
     @property
     def resources(self) -> dict[str, Resource]:
