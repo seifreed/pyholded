@@ -92,6 +92,22 @@ def test_not_found_error(httpx_mock: HTTPXMock) -> None:
         client.contacts.get(id="x")
 
 
+def test_problem_json_error_message(httpx_mock: HTTPXMock) -> None:
+    # Regression: Holded v2 returns RFC 7807 problem+json; surface its "detail".
+    httpx_mock.add_response(
+        status_code=404,
+        json={
+            "type": "https://api.holded.com/problems/not-found",
+            "title": "Not found",
+            "detail": "Not Found",
+            "status": 404,
+        },
+    )
+    with _client() as client, pytest.raises(NotFoundError) as excinfo:
+        client.contacts.get(id="x")
+    assert str(excinfo.value) == "Not Found"
+
+
 def test_unknown_operation() -> None:
     with _client() as client, pytest.raises(EndpointNotFoundError):
         client.call("contacts", "frobnicate")

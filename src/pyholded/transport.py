@@ -114,8 +114,10 @@ def _safe_json(response: httpx.Response) -> Any:
 
 
 def _error_message(response: httpx.Response, payload: Any) -> str:
+    # Covers Holded's "message"/"error"/"info" bodies and RFC 7807 problem+json
+    # ("detail"/"title"), which the v2 API returns for 4xx responses.
     if isinstance(payload, dict):
-        for key in ("message", "error", "info"):
+        for key in ("message", "error", "info", "detail", "title"):
             value = payload.get(key)
             if isinstance(value, str) and value:
                 return value
