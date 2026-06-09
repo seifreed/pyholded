@@ -844,7 +844,7 @@
       },
       "purl": "pkg:pypi/pyholded@0.1.0"
     },
-    "timestamp": "2026-06-09T12:28:04.544855+00:00",
+    "timestamp": "2026-06-09T12:49:14.625806+00:00",
     "tools": {
       "components": [
         {
@@ -972,7 +972,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:53179381-0d43-4caa-87a0-9a3b610648ba",
+  "serialNumber": "urn:uuid:3cebd59a-901b-46d3-8164-0a18db8b6bc5",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
@@ -1005,6 +1005,6 @@
       "x": "jw-oAUK7Memod4C0ndRCzvwxTJip6ch980_5yzadh9A",
       "y": "C_ghU74CoQsynT4KieRF2bTyJYy1MU7kntMgEEKP-lc"
     },
-    "value": "Y8fhoIb28ZUJkx0JFlbysiChJ0-TemUpen8SnF9FmIU99YpZhD72suI7oLr64g9mWjvtd2YR73idfCg3PXj-qA"
+    "value": "p7vo56hBW8XLfN0yVbYDuewX1Myw_QIdqqiE8L5_mjOVUHf3BngE1SBm6jcg2cIyTOgU0zae3IUiNSHK_Gvruw"
   }
 }
