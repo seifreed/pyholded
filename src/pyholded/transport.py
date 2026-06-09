@@ -70,9 +70,11 @@ class Transport:
         if not response.content:
             return None
         try:
-            return response.json()
+            data = response.json()
         except ValueError:
             return response.text
+        _raise_for_envelope_error(data, response)
+        return data
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
@@ -111,6 +113,19 @@ def _safe_json(response: httpx.Response) -> Any:
         return response.json()
     except ValueError:
         return response.text or None
+
+
+def _raise_for_envelope_error(payload: Any, response: httpx.Response) -> None:
+    """Raise on Holded's ``{"status": 0, "info": ...}`` error body returned with HTTP 200.
+
+    Some Holded endpoints (e.g. a delete the key is not allowed to perform) reply
+    200 with this failure envelope instead of a 4xx, which would otherwise be
+    mistaken for success.
+    """
+    if isinstance(payload, dict) and payload.get("status") == 0 and "info" in payload:
+        info = payload.get("info")
+        message = str(info) if info else "Holded API request failed"
+        raise APIError(message, status_code=response.status_code, payload=payload)
 
 
 def _error_message(response: httpx.Response, payload: Any) -> str:

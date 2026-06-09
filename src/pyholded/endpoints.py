@@ -47,6 +47,11 @@ def _document(segment: str, singular: str) -> Resource:
 
     The resource name is the plural path ``segment`` (snake-cased); ``singular``
     is only used to phrase the help text.
+
+    Note on the v2 document body: ``create``/``update`` expect line items under
+    the ``items`` key, while ``get`` returns them under ``lines`` — pass
+    ``data={"contact_id": ..., "items": [{"name", "units", "price", "tax"}]}``.
+    Documents are created as drafts (no fiscal number) until issued.
     """
     name = segment.replace("-", "_")
     item = f"{segment}/{{id}}"

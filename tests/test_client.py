@@ -9,7 +9,12 @@ import pytest
 from pytest_httpx import HTTPXMock
 
 from pyholded import HoldedClient
-from pyholded.exceptions import AuthenticationError, EndpointNotFoundError, NotFoundError
+from pyholded.exceptions import (
+    APIError,
+    AuthenticationError,
+    EndpointNotFoundError,
+    NotFoundError,
+)
 from pyholded.transport import Transport
 
 BASE = "https://api.holded.test/api/v2/"
@@ -124,3 +129,22 @@ def test_generic_request(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(url=f"{BASE}taxes", json={"items": [{"id": "t1"}]})
     with _client() as client:
         assert client.request("GET", "taxes") == {"items": [{"id": "t1"}]}
+
+
+def test_status_zero_envelope_raises(httpx_mock: HTTPXMock) -> None:
+    # Regression: Holded replies HTTP 200 with {"status":0,"info":...} for some
+    # failures (e.g. an unauthorised delete); that must raise, not look like success.
+    httpx_mock.add_response(
+        url=f"{BASE}invoices/x",
+        method="DELETE",
+        json={"status": 0, "info": "Insuficient access"},
+    )
+    with _client() as client, pytest.raises(APIError, match="Insuficient access"):
+        client.invoices.delete(id="x")
+
+
+def test_status_one_envelope_is_success(httpx_mock: HTTPXMock) -> None:
+    # The success envelope ({"status": 1}) must pass through untouched.
+    httpx_mock.add_response(url=f"{BASE}contacts", method="POST", json={"status": 1, "id": "c1"})
+    with _client() as client:
+        assert client.contacts.create(data={"name": "x"}) == {"status": 1, "id": "c1"}
