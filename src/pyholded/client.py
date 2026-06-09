@@ -4,8 +4,8 @@ Resources and their operations are exposed as attributes generated from the
 endpoint registry::
 
     client = HoldedClient()                       # token from env or config file
-    invoices = client.documents.list(docType="invoice")
-    contact = client.contacts.get(contactId="...")
+    invoices = client.invoices.list(params={"limit": 50})
+    contact = client.contacts.get(id="0123456789abcdef01234567")
 
 Any endpoint can also be reached generically via :meth:`HoldedClient.request`.
 """
@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ._proxies import ResourceProxy
 from ._registry import Endpoint, Resource, build_index, render_path
 from .config import resolve_config
 from .endpoints import REGISTRY
@@ -149,46 +150,3 @@ class HoldedClient:
                 return items
             seen_cursors.add(cursor)
             query["cursor"] = cursor
-
-
-class ResourceProxy:
-    """Attribute access wrapper for a single resource's operations."""
-
-    def __init__(self, client: HoldedClient, resource: Resource) -> None:
-        self._client = client
-        self._resource = resource
-
-    def __getattr__(self, name: str) -> OperationProxy:
-        endpoint = self._resource.get(name)
-        if endpoint is None:
-            raise AttributeError(name)
-        return OperationProxy(self._client, self._resource.name, endpoint)
-
-    def __dir__(self) -> list[str]:
-        return [*super().__dir__(), *self._resource.operations]
-
-
-class OperationProxy:
-    """A bound, callable API operation."""
-
-    def __init__(self, client: HoldedClient, resource: str, endpoint: Endpoint) -> None:
-        self._client = client
-        self._resource = resource
-        self._endpoint = endpoint
-
-    def __call__(
-        self,
-        *,
-        params: dict[str, Any] | None = None,
-        data: Any = None,
-        paginate: bool = False,
-        **path_params: str,
-    ) -> Any:
-        return self._client.call(
-            self._resource,
-            self._endpoint.name,
-            path_params=path_params,
-            params=params,
-            data=data,
-            paginate=paginate,
-        )
