@@ -74,7 +74,14 @@ class HoldedClient:
         merged ``items`` list is returned.
         """
         endpoint = self._lookup(resource, operation)
-        path = render_path(endpoint.path, path_params or {})
+        path_params = path_params or {}
+        unknown = set(path_params) - set(endpoint.path_params)
+        if unknown:
+            raise TypeError(
+                f"unexpected argument(s) {sorted(unknown)} for {resource}.{operation}; "
+                f"pass query parameters via params=, the request body via data="
+            )
+        path = render_path(endpoint.path, path_params)
         if paginate and endpoint.method == "GET" and not endpoint.binary:
             return self._paginate(path, params)
         return self._invoke(endpoint, path, params, data)

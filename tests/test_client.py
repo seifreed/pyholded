@@ -113,6 +113,13 @@ def test_unknown_operation() -> None:
         client.call("contacts", "frobnicate")
 
 
+def test_misplaced_query_kwarg_raises() -> None:
+    # Regression: a query param passed as a kwarg used to be silently dropped
+    # (e.g. list(limit=5) sent no query at all). It must now raise, not no-op.
+    with _client() as client, pytest.raises(TypeError, match="limit"):
+        client.contacts.list(limit="5")
+
+
 def test_generic_request(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(url=f"{BASE}taxes", json={"items": [{"id": "t1"}]})
     with _client() as client:
