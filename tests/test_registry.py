@@ -39,3 +39,10 @@ def test_render_path_substitutes() -> None:
 def test_render_path_missing_param() -> None:
     with pytest.raises(KeyError):
         render_path("invoices/{id}", {})
+
+
+def test_render_path_encodes_special_chars() -> None:
+    # Regression: an id with /, # or ? must not corrupt the path/query.
+    assert render_path("contacts/{id}", {"id": "a/b#c?d"}) == "contacts/a%2Fb%23c%3Fd"
+    # Plain hex ids (the real-world case) are unchanged.
+    assert render_path("contacts/{id}", {"id": "5eaa9a4e"}) == "contacts/5eaa9a4e"

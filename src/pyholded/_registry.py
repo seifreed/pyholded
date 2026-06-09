@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from urllib.parse import quote
 
 _PLACEHOLDER = re.compile(r"\{([^}]+)\}")
 
@@ -62,7 +63,11 @@ def build_index(resources: tuple[Resource, ...]) -> dict[str, Resource]:
 
 
 def render_path(template: str, path_params: dict[str, str]) -> str:
-    """Substitute ``{placeholders}`` in ``template`` with ``path_params`` values."""
+    """Substitute ``{placeholders}`` in ``template`` with ``path_params`` values.
+
+    Each value is percent-encoded as a single path segment, so an id containing
+    ``/``, ``#`` or ``?`` cannot corrupt the request URL.
+    """
     missing: list[str] = []
 
     def _sub(match: re.Match[str]) -> str:
@@ -71,7 +76,7 @@ def render_path(template: str, path_params: dict[str, str]) -> str:
         if value is None or value == "":
             missing.append(key)
             return ""
-        return str(value)
+        return quote(str(value), safe="")
 
     rendered = _PLACEHOLDER.sub(_sub, template)
     if missing:
