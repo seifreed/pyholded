@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.py text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.bundle binary
+sbom.cdx.json text eol=lf
