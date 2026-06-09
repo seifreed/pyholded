@@ -7,22 +7,16 @@ external key material is needed. Exits non-zero if the signature is invalid.
 
 from __future__ import annotations
 
-import base64
 import json
 import sys
 from pathlib import Path
 from typing import Any
 
+from _sbom_signing import COORD_BYTES, b64url_decode, canonical_bytes
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
-
-_COORD = 32
-
-
-def _b64url_decode(value: str) -> bytes:
-    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
 def verify(sbom: dict[str, Any]) -> bool:
@@ -30,20 +24,16 @@ def verify(sbom: dict[str, Any]) -> bool:
     signature = sbom.get("signature")
     if not isinstance(signature, dict):
         raise ValueError("SBOM has no signature block")
-    payload = json.dumps(
-        {k: v for k, v in sbom.items() if k != "signature"},
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    payload = canonical_bytes(sbom)
     jwk = signature["publicKey"]
     public_key = ec.EllipticCurvePublicNumbers(
-        int.from_bytes(_b64url_decode(jwk["x"]), "big"),
-        int.from_bytes(_b64url_decode(jwk["y"]), "big"),
+        int.from_bytes(b64url_decode(jwk["x"]), "big"),
+        int.from_bytes(b64url_decode(jwk["y"]), "big"),
         ec.SECP256R1(),
     ).public_key()
-    raw = _b64url_decode(signature["value"])
+    raw = b64url_decode(signature["value"])
     der = encode_dss_signature(
-        int.from_bytes(raw[:_COORD], "big"), int.from_bytes(raw[_COORD:], "big")
+        int.from_bytes(raw[:COORD_BYTES], "big"), int.from_bytes(raw[COORD_BYTES:], "big")
     )
     try:
         public_key.verify(der, payload, ec.ECDSA(hashes.SHA256()))

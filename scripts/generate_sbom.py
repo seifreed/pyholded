@@ -20,7 +20,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import re
 import shutil
@@ -29,11 +28,10 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+from _sbom_signing import COORD_BYTES, b64url_encode, canonical_bytes
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
-
-_EC_COORD_BYTES = 32  # P-256 coordinate size
 
 _MAX_LICENSE_LEN = 64
 _HASH_RE = re.compile(r"--hash=sha256:([0-9a-f]{64})")
@@ -234,16 +232,6 @@ def _set_metadata(sbom: dict[str, Any]) -> None:
         component["licenses"] = _license_entries("MIT")
 
 
-def _b64url(raw: bytes) -> str:
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
-
-
-def _canonical_bytes(sbom: dict[str, Any]) -> bytes:
-    """Deterministic JSON bytes of the SBOM (signature excluded) — the signing payload."""
-    payload = {key: value for key, value in sbom.items() if key != "signature"}
-    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-
-
 def _load_or_create_key(key_path: Path) -> ec.EllipticCurvePrivateKey:
     """Load a PEM P-256 private key, generating and persisting one if absent."""
     if key_path.exists():
@@ -268,8 +256,8 @@ def _jwk(private_key: ec.EllipticCurvePrivateKey) -> dict[str, str]:
     return {
         "kty": "EC",
         "crv": "P-256",
-        "x": _b64url(numbers.x.to_bytes(_EC_COORD_BYTES, "big")),
-        "y": _b64url(numbers.y.to_bytes(_EC_COORD_BYTES, "big")),
+        "x": b64url_encode(numbers.x.to_bytes(COORD_BYTES, "big")),
+        "y": b64url_encode(numbers.y.to_bytes(COORD_BYTES, "big")),
     }
 
 
@@ -281,13 +269,13 @@ def sign(sbom: dict[str, Any], key_path: Path) -> None:
     embedded as a JWK, so the signature is independently verifiable.
     """
     private_key = _load_or_create_key(key_path)
-    der_signature = private_key.sign(_canonical_bytes(sbom), ec.ECDSA(hashes.SHA256()))
+    der_signature = private_key.sign(canonical_bytes(sbom), ec.ECDSA(hashes.SHA256()))
     r, s = decode_dss_signature(der_signature)
-    raw = r.to_bytes(_EC_COORD_BYTES, "big") + s.to_bytes(_EC_COORD_BYTES, "big")
+    raw = r.to_bytes(COORD_BYTES, "big") + s.to_bytes(COORD_BYTES, "big")
     sbom["signature"] = {
         "algorithm": "ES256",
         "publicKey": _jwk(private_key),
-        "value": _b64url(raw),
+        "value": b64url_encode(raw),
     }
 
 
