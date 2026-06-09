@@ -16,6 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ._proxies import ResourceProxy
 from .client import HoldedClient
 from .config import resolve_accounts
 from .exceptions import ConfigError, HoldedError
@@ -89,42 +90,9 @@ class MultiClient:
     def __exit__(self, *_exc: object) -> None:
         self.close()
 
-    def __getattr__(self, name: str) -> _MultiResourceProxy:
+    def __getattr__(self, name: str) -> ResourceProxy:
         clients = self.__dict__.get("_clients", {})
         any_client = next(iter(clients.values()), None)
         if any_client is None or name not in any_client.resources:
             raise AttributeError(name)
-        return _MultiResourceProxy(self, name)
-
-
-class _MultiResourceProxy:
-    def __init__(self, multi: MultiClient, resource: str) -> None:
-        self._multi = multi
-        self._resource = resource
-
-    def __getattr__(self, name: str) -> _MultiOperationProxy:
-        return _MultiOperationProxy(self._multi, self._resource, name)
-
-
-class _MultiOperationProxy:
-    def __init__(self, multi: MultiClient, resource: str, operation: str) -> None:
-        self._multi = multi
-        self._resource = resource
-        self._operation = operation
-
-    def __call__(
-        self,
-        *,
-        params: dict[str, Any] | None = None,
-        data: Any = None,
-        paginate: bool = False,
-        **path_params: str,
-    ) -> dict[str, Any]:
-        return self._multi.call(
-            self._resource,
-            self._operation,
-            path_params=path_params,
-            params=params,
-            data=data,
-            paginate=paginate,
-        )
+        return ResourceProxy(self, any_client.resources[name])

@@ -144,3 +144,11 @@ def test_multiclient_unknown_resource_raises() -> None:
     multi = MultiClient({"acme": _stub_client("acme")})
     with multi, pytest.raises(AttributeError):
         _ = multi.no_such_resource
+
+
+def test_multiclient_unknown_operation_raises() -> None:
+    # The shared proxy validates operations, so a bad op fails at attribute
+    # access on the fan-out client just as it does on a single client.
+    multi = MultiClient({"acme": _stub_client("acme")})
+    with multi, pytest.raises(AttributeError):
+        _ = multi.contacts.frobnicate
