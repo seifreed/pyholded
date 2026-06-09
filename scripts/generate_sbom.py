@@ -332,8 +332,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--signing-dir", type=Path, default=Path("signing"))
     args = parser.parse_args(argv)
 
+    # The lockfile defines the runtime scope and the component hashes; without it
+    # the scope filter would silently produce an empty SBOM.
+    if not args.lock.exists():
+        parser.error(f"lockfile not found: {args.lock} (run `make lock` to generate it)")
+
     sbom = generate_base(args.venv, args.pyproject)
-    lock_hashes = parse_lock_hashes(args.lock) if args.lock.exists() else {}
+    lock_hashes = parse_lock_hashes(args.lock)
     enriched = enrich(sbom, lock_hashes)
 
     signed = False
