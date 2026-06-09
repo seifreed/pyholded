@@ -295,11 +295,14 @@ def generate_base(venv: Path, pyproject: Path) -> dict[str, Any]:
     executable = shutil.which("cyclonedx-py")
     if executable is None:
         raise RuntimeError("cyclonedx-py not found on PATH (pip install cyclonedx-bom)")
+    # Point at the venv when present; otherwise introspect the running interpreter
+    # (e.g. CI installs into the system Python with no ./venv directory).
+    target = [str(venv)] if venv.exists() else []
     result = subprocess.run(
         [
             executable,
             "environment",
-            str(venv),
+            *target,
             "--pyproject",
             str(pyproject),
             "--output-format",
