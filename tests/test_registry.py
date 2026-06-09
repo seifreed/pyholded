@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pyholded._registry import build_index, render_path
+from pyholded._registry import Endpoint, Resource, build_index, render_path
 from pyholded.endpoints import REGISTRY
 
 VALID_METHODS = {"GET", "POST", "PUT", "DELETE"}
@@ -46,3 +46,14 @@ def test_render_path_encodes_special_chars() -> None:
     assert render_path("contacts/{id}", {"id": "a/b#c?d"}) == "contacts/a%2Fb%23c%3Fd"
     # Plain hex ids (the real-world case) are unchanged.
     assert render_path("contacts/{id}", {"id": "5eaa9a4e"}) == "contacts/5eaa9a4e"
+
+
+def test_build_index_rejects_duplicate_names() -> None:
+    resource = Resource(
+        module="m",
+        name="dup",
+        description="d",
+        endpoints=(Endpoint(name="list", method="GET", path="dup"),),
+    )
+    with pytest.raises(ValueError, match="Duplicate resource name"):
+        build_index((resource, resource))

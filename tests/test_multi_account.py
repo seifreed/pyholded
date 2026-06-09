@@ -95,3 +95,52 @@ def test_multiclient_captures_per_account_error(httpx_mock: HTTPXMock) -> None:
     # One account failing must not abort the other.
     assert "items" in result["good"]
     assert "error" in result["bad"]
+
+
+def test_multiclient_requires_at_least_one_account() -> None:
+    with pytest.raises(ConfigError, match="at least one account"):
+        MultiClient({})
+
+
+def test_from_accounts_builds_every_configured_account(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("HOLDED_TOKEN_ACME", "a")
+    monkeypatch.setenv("HOLDED_TOKEN_PERSONAL", "b")
+    with MultiClient.from_accounts(config_path=Path("/none.toml")) as multi:
+        assert set(multi.accounts) == {"acme", "personal"}
+
+
+def test_from_accounts_without_any_account_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    with pytest.raises(ConfigError, match="No Holded accounts"):
+        MultiClient.from_accounts(config_path=Path("/none.toml"))
+
+
+def test_from_accounts_rejects_unknown_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("HOLDED_TOKEN_ACME", "a")
+    with pytest.raises(ConfigError, match="Unknown account"):
+        MultiClient.from_accounts(["nope"], config_path=Path("/none.toml"))
+
+
+def test_from_accounts_selects_named_subset(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("HOLDED_TOKEN_ACME", "a")
+    monkeypatch.setenv("HOLDED_TOKEN_PERSONAL", "b")
+    with MultiClient.from_accounts(["acme"], config_path=Path("/none.toml")) as multi:
+        assert multi.accounts == ["acme"]
+
+
+def test_multiclient_request_fans_out(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(url=f"{BASE}taxes", json={"items": [{"id": "t1"}]})
+    httpx_mock.add_response(url=f"{BASE}taxes", json={"items": [{"id": "t2"}]})
+    multi = MultiClient({"acme": _stub_client("acme"), "personal": _stub_client("personal")})
+    with multi:
+        result = multi.request("GET", "taxes")
+    assert set(result) == {"acme", "personal"}
+
+
+def test_multiclient_unknown_resource_raises() -> None:
+    multi = MultiClient({"acme": _stub_client("acme")})
+    with multi, pytest.raises(AttributeError):
+        _ = multi.no_such_resource

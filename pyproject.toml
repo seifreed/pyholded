@@ -44,7 +44,9 @@ dev = [
   "vulture",
   "pip-audit",
   "pytest",
+  "pytest-cov",
   "pytest-httpx",
+  "coverage",
   "cryptography",
   "cyclonedx-bom",
 ]
@@ -91,4 +93,12 @@ min_confidence = 80
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --cov=pyholded --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["pyholded"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100

@@ -39,3 +39,28 @@ def test_render_rich_table(capsys: pytest.CaptureFixture[str]) -> None:
     out = capsys.readouterr().out
     assert "Alice" in out
     assert "name" in out
+
+
+def test_render_rich_unwraps_items_envelope(capsys: pytest.CaptureFixture[str]) -> None:
+    render({"items": RECORDS, "cursor": None, "has_more": False}, OutputFormat.RICH)
+    out = capsys.readouterr().out
+    assert "Alice" in out
+    assert "name" in out
+
+
+def test_render_rich_falls_back_to_json_for_non_records(capsys: pytest.CaptureFixture[str]) -> None:
+    render({"k": "v"}, OutputFormat.RICH)
+    assert "k" in capsys.readouterr().out
+
+
+def test_render_rich_cells_render_none_and_nested(capsys: pytest.CaptureFixture[str]) -> None:
+    render([{"id": 1, "note": None, "meta": {"x": 1}}], OutputFormat.RICH)
+    out = capsys.readouterr().out
+    assert "id" in out
+    assert "meta" in out
+
+
+def test_render_rich_wide_records_fall_back_to_json(capsys: pytest.CaptureFixture[str]) -> None:
+    # More columns than a table can show legibly: fall back to JSON.
+    render([{f"c{i}": i for i in range(9)}], OutputFormat.RICH)
+    assert "c0" in capsys.readouterr().out

@@ -148,3 +148,45 @@ def test_status_one_envelope_is_success(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(url=f"{BASE}contacts", method="POST", json={"status": 1, "id": "c1"})
     with _client() as client:
         assert client.contacts.create(data={"name": "x"}) == {"status": 1, "id": "c1"}
+
+
+def test_account_defaults_to_default() -> None:
+    with _client() as client:
+        assert client.account == "default"
+
+
+def test_resources_index_is_exposed() -> None:
+    with _client() as client:
+        assert "contacts" in client.resources
+
+
+def test_unknown_resource_attribute_raises() -> None:
+    with _client() as client, pytest.raises(AttributeError):
+        _ = client.no_such_resource
+
+
+def test_dir_includes_resource_names() -> None:
+    with _client() as client:
+        assert "contacts" in dir(client)
+
+
+def test_call_unknown_resource_raises() -> None:
+    with _client() as client, pytest.raises(EndpointNotFoundError, match="Unknown resource"):
+        client.call("nope", "list")
+
+
+def test_paginate_non_paginated_body_returns_single_item(httpx_mock: HTTPXMock) -> None:
+    # A GET asked to paginate but returning a non-envelope body hands it back whole.
+    httpx_mock.add_response(url=f"{BASE}contacts", json={"foo": "bar"})
+    with _client() as client:
+        assert client.contacts.list(paginate=True) == [{"foo": "bar"}]
+
+
+def test_resource_proxy_unknown_operation_raises() -> None:
+    with _client() as client, pytest.raises(AttributeError):
+        _ = client.contacts.frobnicate
+
+
+def test_resource_proxy_dir_lists_operations() -> None:
+    with _client() as client:
+        assert "list" in dir(client.contacts)
