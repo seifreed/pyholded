@@ -55,14 +55,19 @@ class Transport:
         *,
         params: dict[str, Any] | None = None,
         json: Any = None,
+        files: dict[str, tuple[str, bytes]] | None = None,
         binary: bool = False,
     ) -> Any:
-        """Send a request and return the decoded body (or raw bytes if ``binary``)."""
+        """Send a request and return the decoded body (or raw bytes if ``binary``).
+
+        ``files`` sends a multipart body (``{field: (filename, content)}``).
+        """
         response = self._client.request(
             method.upper(),
             path,
             params=_clean_params(params),
             json=json,
+            files=files,
         )
         self._raise_for_status(response)
         if binary:

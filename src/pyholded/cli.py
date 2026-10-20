@@ -162,6 +162,15 @@ def _operation_command(resource: Resource, endpoint: Endpoint) -> click.Command:
                 help="body field as key=value (repeatable)",
             )
         )
+    if endpoint.upload:
+        params.append(
+            click.Option(
+                ["--file", "upload"],
+                required=True,
+                type=click.Path(exists=True, dir_okay=False, path_type=Path),
+                help="local file to upload",
+            )
+        )
     paginates = endpoint.method == "GET" and not endpoint.binary
     if paginates:
         params.append(
@@ -183,7 +192,9 @@ def _operation_command(resource: Resource, endpoint: Endpoint) -> click.Command:
             name: kwargs[dest] for name, dest in query_dests.items() if kwargs.get(dest) is not None
         }
         data = (
-            _parse_data(kwargs.get("data"), kwargs.get("fields", ())) if endpoint.has_body else None
+            _parse_data(kwargs.get("data"), kwargs.get("fields", ()))
+            if endpoint.has_body
+            else kwargs.get("upload")
         )
         result = state.run_call(
             resource.name,
@@ -193,6 +204,9 @@ def _operation_command(resource: Resource, endpoint: Endpoint) -> click.Command:
             data=data,
             paginate=bool(kwargs.get("fetch_all")),
         )
+        if isinstance(result, bytes):
+            sys.stdout.buffer.write(result)
+            return
         render(result, state.resolve_format(kwargs.get("output")))
 
     return click.Command(

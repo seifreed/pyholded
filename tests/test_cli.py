@@ -229,3 +229,51 @@ def test_module_executes_as_script(
     monkeypatch.delitem(sys.modules, "pyholded.cli", raising=False)
     runpy.run_module("pyholded.cli", run_name="__main__")
     assert "contacts" in capsys.readouterr().out
+
+
+def test_binary_operation_writes_raw_bytes(httpx_mock: HTTPXMock) -> None:
+    # Regression: get-pdf used to render the bytes' repr instead of the file.
+    httpx_mock.add_response(url=f"{BASE}invoices/x/pdf", content=b"%PDF-1.4")
+    result = CliRunner().invoke(cli, _args("invoices", "get-pdf", "--id", "x"))
+    assert result.exit_code == 0, result.output
+    assert result.stdout_bytes == b"%PDF-1.4"
+
+
+def test_attach_file_uploads(httpx_mock: HTTPXMock, tmp_path: Path) -> None:
+    httpx_mock.add_response(
+        url=f"{BASE}purchases/x/attachments",
+        method="POST",
+        status_code=201,
+        json={"status": "attached"},
+    )
+    upload = tmp_path / "receipt.pdf"
+    upload.write_bytes(b"%PDF")
+    result = CliRunner().invoke(
+        cli, _args("purchases", "attach-file", "--id", "x", "--file", str(upload), "-o", "json")
+    )
+    assert result.exit_code == 0, result.output
+    assert "attached" in result.output
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert b'filename="receipt.pdf"' in request.read()
+
+
+def test_create_payment_command(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url=f"{BASE}invoices/x/payments", method="POST", json={"status": "paid"}
+    )
+    result = CliRunner().invoke(
+        cli,
+        _args(
+            "invoices",
+            "create-payment",
+            "--id",
+            "x",
+            "--data",
+            '{"treasury_id": "t1", "amount": 10, "date": "2026-01-31"}',
+            "-o",
+            "json",
+        ),
+    )
+    assert result.exit_code == 0, result.output
+    assert "paid" in result.output

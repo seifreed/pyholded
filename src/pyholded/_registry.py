@@ -27,6 +27,7 @@ class Endpoint:
     query_params: tuple[str, ...] = ()
     has_body: bool = False
     binary: bool = False
+    upload: bool = False  # multipart file upload; ``data`` is the local file path
 
     @property
     def path_params(self) -> tuple[str, ...]:

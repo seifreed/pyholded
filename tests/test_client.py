@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -190,3 +191,54 @@ def test_resource_proxy_unknown_operation_raises() -> None:
 def test_resource_proxy_dir_lists_operations() -> None:
     with _client() as client:
         assert "list" in dir(client.contacts)
+
+
+def test_create_payment_posts_to_document(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url=f"{BASE}purchases/abc/payments", method="POST", json={"status": "paid"}
+    )
+    payment = {"treasury_id": "t1", "amount": 12.1, "date": "2026-01-31"}
+    with _client() as client:
+        assert client.purchases.createPayment(id="abc", data=payment) == {"status": "paid"}
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert json.loads(request.read()) == payment
+
+
+def test_attach_file_sends_multipart(httpx_mock: HTTPXMock, tmp_path: Path) -> None:
+    httpx_mock.add_response(
+        url=f"{BASE}purchases/abc/attachments",
+        method="POST",
+        status_code=201,
+        json={"status": "attached"},
+    )
+    upload = tmp_path / "invoice-1.pdf"
+    upload.write_bytes(b"%PDF-1.4 body")
+    with _client() as client:
+        assert client.purchases.attachFile(id="abc", data=upload) == {"status": "attached"}
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert request.headers["Content-Type"].startswith("multipart/form-data")
+    body = request.read()
+    assert b'name="file"; filename="invoice-1.pdf"' in body
+    assert b"%PDF-1.4 body" in body
+
+
+def test_list_and_get_attachment(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url=f"{BASE}invoices/abc/attachments",
+        json={"items": [{"id": "invoice1.pdf"}], "cursor": None, "has_more": False},
+    )
+    httpx_mock.add_response(url=f"{BASE}invoices/abc/attachments/invoice1.pdf", content=b"%PDF")
+    with _client() as client:
+        assert client.invoices.listAttachments(id="abc", paginate=True) == [{"id": "invoice1.pdf"}]
+        assert client.invoices.getAttachment(id="abc", name="invoice1.pdf") == b"%PDF"
+
+
+def test_generic_request_with_files(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(url=f"{BASE}upload", method="POST", json={"ok": True})
+    with _client() as client:
+        assert client.request("POST", "upload", files={"file": ("a.txt", b"hi")}) == {"ok": True}
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert b'filename="a.txt"' in request.read()

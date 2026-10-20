@@ -60,10 +60,16 @@ class HoldedClient:
         *,
         params: dict[str, Any] | None = None,
         json: Any = None,
+        files: dict[str, tuple[str, bytes]] | None = None,
         binary: bool = False,
     ) -> Any:
-        """Call an arbitrary endpoint (escape hatch for anything not modelled)."""
-        return self._transport.request(method, path, params=params, json=json, binary=binary)
+        """Call an arbitrary endpoint (escape hatch for anything not modelled).
+
+        ``files`` sends a multipart body (``{field: (filename, content)}``).
+        """
+        return self._transport.request(
+            method, path, params=params, json=json, files=files, binary=binary
+        )
 
     def call(
         self,
@@ -131,11 +137,13 @@ class HoldedClient:
         data: Any,
     ) -> Any:
         body = data if endpoint.has_body else None
+        files = {"file": _read_upload(data)} if endpoint.upload else None
         return self._transport.request(
             endpoint.method,
             path,
             params=params,
             json=body,
+            files=files,
             binary=endpoint.binary,
         )
 
@@ -157,3 +165,9 @@ class HoldedClient:
                 return items
             seen_cursors.add(cursor)
             query["cursor"] = cursor
+
+
+def _read_upload(source: str | Path) -> tuple[str, bytes]:
+    """Load a local file as a multipart ``(filename, content)`` part."""
+    path = Path(source)
+    return path.name, path.read_bytes()

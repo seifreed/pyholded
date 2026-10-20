@@ -43,7 +43,7 @@ def _crud(
 
 
 def _document(segment: str, singular: str) -> Resource:
-    """Build a sales/purchase document resource: CRUD + pdf/send actions.
+    """Build a sales/purchase document resource: CRUD + pdf/send/payment/attachment actions.
 
     The resource name is the plural path ``segment`` (snake-cased); ``singular``
     is only used to phrase the help text.
@@ -52,9 +52,19 @@ def _document(segment: str, singular: str) -> Resource:
     - ``create``/``update`` expect line items under the ``items`` key, while
       ``get`` returns them under ``lines`` — pass
       ``data={"contact_id": ..., "items": [{"name", "units", "price", "tax"}]}``.
+    - The document number is written as ``number``; ``get`` returns it as
+      ``document_number``, which is silently ignored on write.
     - Documents are created as drafts (no fiscal number) until issued.
-    - There is no ``/pay`` action; register payments via the ``payments``
-      resource (``document_type`` + ``document_id`` link the payment).
+    - Pay a document with ``createPayment``:
+      ``data={"treasury_id": ..., "amount": ..., "date": "YYYY-MM-DD"}``. The amount
+      is in the company currency and must be > 0 (credit notes with a negative total
+      cannot be settled this way). ``payments.create`` with ``document_id`` does
+      NOT link the payment to the document. Deleting a document deletes its payments.
+    - Foreign-currency documents expose ``currency_change`` rounded to 2 decimals;
+      Holded converts payments with a more precise internal rate.
+    - ``attachFile`` uploads a file (``data`` = local path); Holded strips ``-``,
+      ``_``, spaces and parentheses from the stored name, which is the ``name``
+      that ``getAttachment`` expects.
     """
     name = segment.replace("-", "_")
     item = f"{segment}/{{id}}"
@@ -70,6 +80,30 @@ def _document(segment: str, singular: str) -> Resource:
             Endpoint("delete", "DELETE", item, f"Delete a {singular}."),
             Endpoint("getPdf", "GET", f"{item}/pdf", f"Download the {singular} PDF.", binary=True),
             Endpoint("send", "POST", f"{item}/send", f"Send a {singular} by email.", has_body=True),
+            Endpoint(
+                "createPayment",
+                "POST",
+                f"{item}/payments",
+                f"Register a payment against a {singular}.",
+                has_body=True,
+            ),
+            Endpoint(
+                "listAttachments", "GET", f"{item}/attachments", f"List a {singular}'s attachments."
+            ),
+            Endpoint(
+                "getAttachment",
+                "GET",
+                f"{item}/attachments/{{name}}",
+                f"Download a {singular} attachment.",
+                binary=True,
+            ),
+            Endpoint(
+                "attachFile",
+                "POST",
+                f"{item}/attachments",
+                f"Attach a file to a {singular}.",
+                upload=True,
+            ),
         ),
     )
 

@@ -51,7 +51,8 @@ Results print as rich tables, JSON, or TOON.
 Records       rich tables, JSON, TOON
 Pagination    cursor-based ({items, cursor, has_more}); --all merges pages
 Auth          Authorization: Bearer <PAT> via env var or config file
-Binary        PDF download for any document type (invoices, credit-notes, ...)
+Binary        PDF and attachment download for any document type (invoices, purchases, ...)
+Uploads       multipart file attachments on any document type
 ```
 
 ---
@@ -163,6 +164,13 @@ holded contacts get --id 0123456789abcdef01234567 -o json
 # Download a document PDF (binary)
 holded invoices get-pdf --id 89abcdef0123456789abcdef > invoice.pdf
 
+# Mark a document as paid, attach its PDF, list/download attachments
+holded purchases create-payment --id 89abcdef0123456789abcdef \
+  --data '{"treasury_id": "0123456789abcdef01234567", "amount": 121.0, "date": "2026-01-31"}'
+holded purchases attach-file --id 89abcdef0123456789abcdef --file invoice.pdf
+holded purchases list-attachments --id 89abcdef0123456789abcdef
+holded purchases get-attachment --id 89abcdef0123456789abcdef --name invoice.pdf > copy.pdf
+
 # Create from inline JSON, a file, or key=value fields
 holded contacts create --data '{"name": "ACME SL"}'
 holded contacts create --data @contact.json
@@ -189,6 +197,8 @@ holded raw GET taxes -o toon
 | `holded <resource> update --id <id> --data <json>` | Update a record |
 | `holded <resource> delete --id <id>` | Delete a record |
 | `holded invoices get-pdf --id <id>` | Download a document PDF (also `send`) |
+| `holded <document> create-payment --id <id> --data <json>` | Register a payment (`treasury_id`, `amount`, `date`) |
+| `holded <document> attach-file --id <id> --file <path>` | Attach a file (also `list-attachments`, `get-attachment`) |
 | `holded raw <METHOD> <PATH>` | Call an arbitrary endpoint |
 
 ### Options
@@ -207,7 +217,7 @@ holded raw GET taxes -o toon
 
 | Group | Resources |
 |-------|-----------|
-| **Documents** (CRUD + `get-pdf`, `send`) | `invoices`, `credit_notes`, `sales_orders`, `estimates`, `proformas`, `waybills`, `sales_receipts`, `purchases`, `purchase_orders` |
+| **Documents** (CRUD + `get-pdf`, `send`, `create-payment`, `attach-file`, `list-attachments`, `get-attachment`) | `invoices`, `credit_notes`, `sales_orders`, `estimates`, `proformas`, `waybills`, `sales_receipts`, `purchases`, `purchase_orders` |
 | **Masters** (CRUD) | `contacts`, `contact_groups`, `products`, `services`, `warehouses`, `payments`, `sales_channels`, `expenses_accounts`, `taxes`, `payment_methods` |
 | **CRM** | `funnels`, `leads` (+ `create-note`, `create-task`), `events`, `bookings`, `booking_locations` |
 | **Projects / Team** | `projects`, `tasks`, `employees` |
@@ -228,6 +238,16 @@ with HoldedClient() as client:                       # token from env or config 
     pdf = client.invoices.getPdf(id="89abcdef0123456789abcdef")   # raw bytes
 
     new = client.contacts.create(data={"name": "ACME SL", "code": "B12345678"})
+
+    # Documents: line items go under "items" and the number under "number"
+    doc = client.purchases.create(data={
+        "contact_id": new["id"], "date": "2026-01-31", "number": "A-001",
+        "items": [{"name": "Hosting", "units": 1, "price": 100.0, "taxes": ["p_iva_21"]}],
+    })
+    client.purchases.createPayment(id=doc["id"], data={
+        "treasury_id": "0123456789abcdef01234567", "amount": 121.0, "date": "2026-01-31",
+    })                                               # amount > 0, company currency
+    client.purchases.attachFile(id=doc["id"], data="invoice.pdf")   # local file path
 
     # Any endpoint, even one not modelled, is reachable directly:
     raw = client.request("GET", "taxes", params={"limit": 5})

@@ -23,6 +23,9 @@ def test_endpoints_are_well_formed() -> None:
             assert not endpoint.path.startswith("/")
             if endpoint.method in {"GET", "DELETE"}:
                 assert not endpoint.has_body, f"{resource.name}.{endpoint.name}"
+            if endpoint.upload:
+                assert endpoint.method == "POST", f"{resource.name}.{endpoint.name}"
+                assert not endpoint.has_body, f"{resource.name}.{endpoint.name}"
 
 
 def test_operation_names_unique_per_resource() -> None:
